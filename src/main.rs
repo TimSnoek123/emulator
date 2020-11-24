@@ -7,9 +7,10 @@ mod registers;
 use std::io;
 use std::io::prelude::*;
 use std::fs::File;
+use std::env::split_paths;
 
 fn main() {
-    let mut cpu = CPU {
+    let cpu = &mut CPU {
         registers: registers::Registers {
             a: 0,
             b: 0,
@@ -25,27 +26,28 @@ fn main() {
             h: 0,
             l: 0,
         },
-        pc: 0x100,
+        pc: 0,
         bus: MemoryBus{
             memory: [0; 0xFFFF]
         }
         ,stop: false
     };
 
-    let file = File::open("test2.gb");
-    let bus  = &mut cpu.bus.memory;
+    let file = File::open("gbroot.gb");
 
-    let reader = file.unwrap().read(bus);
+     file.unwrap().read(&mut cpu.bus.memory);
 
-
-
-    while !cpu.stop {
+    while !cpu.stop  {
         cpu.step();
+//        println!("register a value: {}", cpu.registers.a)
+//        println!("current length: {}", cpu.pc);
 
-//        if cpu.bus.memory[0xff02] == 0x81 {
-//            let c = bus.memory[0xff01];
-//            println!("{}", c);
-//            bus.memory[0xff02] = 0x0;
-//        }
+    }
+
+    println!("Done");
+    if cpu.bus.memory[0xff02] == 0x81 {
+        let c = cpu.bus.memory[0xff01];
+        println!("{}", c);
+        cpu.bus.memory[0xff02] = 0x0;
     }
 }

@@ -40,6 +40,8 @@ pub struct MemoryBus {
 }
 
 impl MemoryBus {
+
+
     fn read_byte(&self, address: u16) -> u8 {
         self.memory[address as usize]
     }
@@ -56,23 +58,29 @@ impl CPU {
         let mut instruction_byte = self.bus.read_byte(self.pc);
 
 //        println!("Current pc: {}", self.pc);
-//        println!("Current byte: {}", instruction_byte);
+//        if instruction_byte > 0 {
+//            println!("Current byte: {}", instruction_byte);
+
+//        }
         self.execute(instruction_byte);
     }
 
     pub fn execute(&mut self, opcode: u8) {
         match opcode {
+            0x00 => {
+//               println!("found: {:x?}", opcode);
+            },
             0x87 => {
                 self.add(self.registers.a);
-                println!("found: {:x?}", opcode);
+               println!("found: {:x?}", opcode);
             }
             0x80 => {
                 self.add(self.registers.b);
-                println!("found: {:x?}", opcode);
+               println!("found: {:x?}", opcode);
             }
             0x81 => {
                 self.add(self.registers.c);
-                println!("found: {:x?}", opcode);
+               println!("found: {:x?}", opcode);
             }
             0x82 => {
                 self.add(self.registers.d);
@@ -91,10 +99,10 @@ impl CPU {
                 println!("found: {:x?}", opcode);
             }
             0x86 => {
-                self.add(self.bus.memory[self.registers.get_hl() as usize]);
+                self.add(self.bus.read_byte(self.registers.get_hl()));
                 println!("found: {:x?}", opcode);
             }
-            _ => {}
+            _ => {println!("didnt find: {}", opcode)}
         }
 
         let (value, overflow) = self.pc.overflowing_add(1);
@@ -130,6 +138,16 @@ impl CPU {
         }
     }
 
+    pub fn load(&mut self, target: ArithmeticTarget, target_value: ArithmeticTarget){
+        let value = self.get_register_value_by_target(target_value);
+        self.write_to_target(value, target);
+    }
+
+    fn load_into_address(&mut self, address: u8, target_value: ArithmeticTarget){
+        let value = self.get_register_value_by_target(target_value);
+        self.bus.memory[address] = value;
+    }
+
     fn add(&mut self, value: u8) {
         let (new_value, did_overflow) = self.registers.a.overflowing_add(value);
 
@@ -137,6 +155,8 @@ impl CPU {
         self.registers.set_subtract(false);
         self.registers.set_carry(did_overflow);
         self.registers.set_half_carry((self.registers.a & 0xF) + (value & 0xF) > 0xF);
+
+        println!("Old a val: {}, new a value {}", self.registers.a, new_value);
 
         self.registers.a = new_value
     }
