@@ -9,8 +9,11 @@ pub struct Registers {
     pub e: u8,
     pub f: FlagsRegister,
     pub h: u8,
-    pub l: u8,
+    pub l: u8
 }
+
+
+
 
 impl Registers {
     pub fn get_af(&self) -> u16 {

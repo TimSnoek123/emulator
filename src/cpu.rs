@@ -1,5 +1,6 @@
 use crate::registers;
-use crate::cpu::ArithmeticTarget::A;
+use crate::cpu::ArithmeticTarget::{A, B, C, D, E, H, L, IMM8};
+use std::borrow::Borrow;
 
 
 enum Instruction {
@@ -25,6 +26,13 @@ enum ArithmeticTarget {
     E,
     H,
     L,
+    IMM8
+}
+enum ArithmeticTarget16 {
+    AF,
+    BC,
+    DE,
+    HL
 }
 
 pub struct CPU {
@@ -40,15 +48,12 @@ pub struct MemoryBus {
 }
 
 impl MemoryBus {
-
-
-    fn read_byte(&self, address: u16) -> u8 {
+    pub fn read_byte(&self, address: u16) -> u8 {
         self.memory[address as usize]
     }
 
     pub fn insert_into_position(&mut self, position: usize, value: u8) {
         self.memory[position] = value;
-        println!("Current test: {}", value);
     }
 }
 
@@ -57,52 +62,67 @@ impl CPU {
     pub fn step(&mut self) {
         let mut instruction_byte = self.bus.read_byte(self.pc);
 
-//        println!("Current pc: {}", self.pc);
-//        if instruction_byte > 0 {
-//            println!("Current byte: {}", instruction_byte);
-
-//        }
         self.execute(instruction_byte);
     }
 
     pub fn execute(&mut self, opcode: u8) {
         match opcode {
-            0x00 => {
-//               println!("found: {:x?}", opcode);
-            },
-            0x87 => {
+            0x00 => {},
+            0x06 => self.load(B, IMM8),
+            0x0E => self.load(C, IMM8),
+            0x16 => self.load(D, IMM8),
+            0x1E => self.load(E, IMM8),
+            0x26 => self.load(H, IMM8),
+            0x2E => self.load(L, IMM8),
+            0x7F => self.load(A, A),
+            0x78 => self.load(A, B),
+            0x79 => self.load(A, C),
+            0x7A => self.load(A, D),
+            0x7B => self.load(A, E),
+            0x7C => self.load(A, H),
+            0x7D => self.load(A, L),
+            0x7E => self.load_address_into(A, self.registers.get_hl()),
+            0x40 => self.load(B, B),
+            0x41 => self.load(B, C),
+            0x42 => self.load(B, D),
+            0x43 => self.load(B, E),
+            0x44 => self.load(B, H),
+            0x45 => self.load(B, L),
+            0x46 => self.load_address_into(B, self.registers.get_hl()),
+            0x47 => self.load(B, A),
+            0x48 => self.load(C, B),
+            0x49 => self.load(C, C),
+            0x4A => self.load(C, D),
+            0x4B => self.load(C, E),
+            0x4C => self.load(C, H),
+            0x4D => self.load(C, L),
+            0x4E => self.load_address_into(C, self.registers.get_hl()),
+            0x4F => self.load(C, A),
+                0x87 => {
                 self.add(self.registers.a);
-               println!("found: {:x?}", opcode);
             }
             0x80 => {
                 self.add(self.registers.b);
-               println!("found: {:x?}", opcode);
             }
             0x81 => {
                 self.add(self.registers.c);
-               println!("found: {:x?}", opcode);
             }
             0x82 => {
                 self.add(self.registers.d);
-                println!("found: {:x?}", opcode);
             }
             0x83 => {
                 self.add(self.registers.e);
-                println!("found: {:x?}", opcode);
             }
             0x84 => {
                 self.add(self.registers.h);
-                println!("found: {:x?}", opcode);
             }
             0x85 => {
                 self.add(self.registers.l);
-                println!("found: {:x?}", opcode);
             }
             0x86 => {
                 self.add(self.bus.read_byte(self.registers.get_hl()));
-                println!("found: {:x?}", opcode);
             }
-            _ => {println!("didnt find: {}", opcode)}
+            _ => {}
         }
 
         let (value, overflow) = self.pc.overflowing_add(1);
@@ -123,6 +143,7 @@ impl CPU {
             ArithmeticTarget::E => self.registers.e,
             ArithmeticTarget::H => self.registers.h,
             ArithmeticTarget::L => self.registers.l,
+            ArithmeticTarget::IMM8 => self.get_immediate8()
         }
     }
 
@@ -135,17 +156,32 @@ impl CPU {
             ArithmeticTarget::E => self.registers.e = value,
             ArithmeticTarget::H => self.registers.h = value,
             ArithmeticTarget::L => self.registers.l = value,
+            ArithmeticTarget::IMM8 => panic!("Can't write to immediate 8 !")
+            //TODO: Set imm8 in other enum
         }
     }
 
-    pub fn load(&mut self, target: ArithmeticTarget, target_value: ArithmeticTarget){
-        let value = self.get_register_value_by_target(target_value);
+    fn get_immediate8(&mut self) -> u8 {
+        self.bus.read_byte(self.pc.wrapping_add(1))
+    }
+
+    pub fn load(&mut self, target: ArithmeticTarget, val: ArithmeticTarget){
+        let value = self.get_register_value_by_target(val);
+        self.write_to_target(value, target);
+    }
+
+    pub fn load_address_into(&mut self, target: ArithmeticTarget, address: u16){
+        let value = self.bus.read_byte(address);
         self.write_to_target(value, target);
     }
 
     fn load_into_address(&mut self, address: u8, target_value: ArithmeticTarget){
         let value = self.get_register_value_by_target(target_value);
-        self.bus.memory[address] = value;
+        self.bus.memory[address as usize] = value;
+    }
+
+    pub fn load_16(&mut self){
+
     }
 
     fn add(&mut self, value: u8) {
@@ -155,8 +191,6 @@ impl CPU {
         self.registers.set_subtract(false);
         self.registers.set_carry(did_overflow);
         self.registers.set_half_carry((self.registers.a & 0xF) + (value & 0xF) > 0xF);
-
-        println!("Old a val: {}, new a value {}", self.registers.a, new_value);
 
         self.registers.a = new_value
     }
@@ -257,13 +291,13 @@ impl CPU {
     }
 
     fn rlc(&mut self, value: u8, target: ArithmeticTarget) {
-        let co = value & 0x80;
+        let c = (value & 0x80) >> 7 == 0x01;
         let new_value = value.rotate_left(1);
 
-        self.registers.set_zero(value == 0);
+        self.registers.set_zero(value == 0x00);
         self.registers.set_subtract(false);
         self.registers.set_half_carry(false);
-        self.registers.set_carry(co != 0);
+        self.registers.set_carry(c);
 
         self.write_to_target(new_value, target);
     }

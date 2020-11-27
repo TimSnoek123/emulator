@@ -4,10 +4,16 @@ use crate::registers::{Registers, FlagsRegister};
 mod cpu;
 mod registers;
 
-use std::io;
 use std::io::prelude::*;
 use std::fs::File;
-use std::env::split_paths;
+use imgui::sys::ImGuiIO_AddInputCharactersUTF8;
+use imgui::{Window, ImStr, Condition};
+
+extern crate azul;
+
+use azul::prelude;
+
+struct AzulDataModel { }
 
 fn main() {
     let cpu = &mut CPU {
@@ -26,14 +32,14 @@ fn main() {
             h: 0,
             l: 0,
         },
-        pc: 0,
+        pc: 0x100,
         bus: MemoryBus{
             memory: [0; 0xFFFF]
         }
         ,stop: false
     };
 
-    let file = File::open("gbroot.gb");
+    let file = File::open("test1.gb");
 
      file.unwrap().read(&mut cpu.bus.memory);
 
@@ -44,6 +50,8 @@ fn main() {
 
     }
 
+    let mut app = App::new(AzulDataModel{}, AppConfig::default()).unwrap();
+
     println!("Done");
     if cpu.bus.memory[0xff02] == 0x81 {
         let c = cpu.bus.memory[0xff01];
@@ -51,3 +59,5 @@ fn main() {
         cpu.bus.memory[0xff02] = 0x0;
     }
 }
+
+
